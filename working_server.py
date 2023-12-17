@@ -399,4 +399,5 @@ async def main():
         await server.serve_forever()
 
 # Запуск основной асинхронной функции
-asyncio.run(main())
+if __name__ == "__main__":
+    asyncio.run(main())
