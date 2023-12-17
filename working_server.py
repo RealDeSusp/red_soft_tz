@@ -2,9 +2,11 @@ import asyncio
 import aiosqlite
 import uuid
 
+# Имя базы данных
 DATABASE_NAME = "clients.db"
 
 
+# Функция для создания нового пользователя
 async def create_user(username, client_id):
     async with aiosqlite.connect(DATABASE_NAME) as db:
         await db.execute(
@@ -14,6 +16,7 @@ async def create_user(username, client_id):
         await db.commit()
 
 
+# Функция для создания нового клиента
 async def create_client(client_id, ram_size, cpu_count, hdd_size, hdd_id):
     async with aiosqlite.connect(DATABASE_NAME) as db:
         await db.execute(
@@ -23,6 +26,7 @@ async def create_client(client_id, ram_size, cpu_count, hdd_size, hdd_id):
         await db.commit()
 
 
+# Функция для добавления текущего подключения
 async def add_current_connection(client_id):
     async with aiosqlite.connect(DATABASE_NAME) as db:
         await db.execute(
@@ -32,6 +36,7 @@ async def add_current_connection(client_id):
         await db.commit()
 
 
+# Функция для удаления текущего подключения
 async def remove_current_connection(client_id):
     async with aiosqlite.connect(DATABASE_NAME) as db:
         await db.execute(
@@ -41,12 +46,14 @@ async def remove_current_connection(client_id):
         await db.commit()
 
 
+# Функция для очистки текущих подключений
 async def clear_current_connections():
     async with aiosqlite.connect(DATABASE_NAME) as db:
         await db.execute("DELETE FROM current_connections")
         await db.commit()
 
 
+# Функция для проверки существования клиента
 async def client_exists(client_id):
     async with aiosqlite.connect(DATABASE_NAME) as db:
         cursor = await db.execute("SELECT COUNT(*) FROM clients WHERE client_id = ?", (client_id,))
@@ -56,6 +63,7 @@ async def client_exists(client_id):
     return count[0] > 0
 
 
+# Обработчик удаления виртуальной машины
 async def handle_remove_virtual_machine(reader, writer, client_id):
     writer.write(b"Enter client_id to remove the virtual machine: ")
     await writer.drain()
@@ -78,6 +86,7 @@ async def handle_remove_virtual_machine(reader, writer, client_id):
             await writer.drain()
 
 
+# Функция для удаления виртуальной машины
 async def remove_virtual_machine(client_id):
     async with aiosqlite.connect(DATABASE_NAME) as db:
         # Remove from clients table
@@ -87,6 +96,7 @@ async def remove_virtual_machine(client_id):
         await db.commit()
 
 
+# Обработчик обновления информации о клиенте
 async def handle_update_client_info(reader, writer):
     writer.write(b"Enter client_id to update client information: ")
     await writer.drain()
@@ -114,6 +124,7 @@ async def handle_update_client_info(reader, writer):
     await writer.drain()
 
 
+# Функция для получения списка жестких дисков
 async def list_hard_disks():
     async with aiosqlite.connect(DATABASE_NAME) as db:
         cursor = await db.execute(
@@ -129,6 +140,7 @@ async def list_hard_disks():
     return hard_disks
 
 
+# Обработчик вывода списка жестких дисков
 async def handle_list_hard_disks(reader, writer):
     writer.write(b"List of hard disks:\r\n")
     await writer.drain()
@@ -144,6 +156,110 @@ async def handle_list_hard_disks(reader, writer):
     await writer.drain()
 
 
+# Функция для получения списка всех подключенных клиентов
+async def list_ever_connected_clients():
+    async with aiosqlite.connect(DATABASE_NAME) as db:
+        cursor = await db.execute(
+            """
+            SELECT u.username, c.client_id, c.ram_size, c.cpu_count, c.hdd_size, c.hdd_id
+            FROM users u
+            LEFT JOIN clients c ON u.client_id = c.client_id
+            """
+        )
+        clients = await cursor.fetchall()
+        await cursor.close()
+
+    return clients
+
+
+# Обработчик вывода списка всех подключенных клиентов
+async def handle_list_ever_connected_clients(reader, writer):
+    writer.write(b"List of ever connected clients:\r\n")
+    await writer.drain()
+
+    clients = await list_ever_connected_clients()
+
+    for client in clients:
+        client_info = f"Username: {client[0]}, Client ID: {client[1]}, RAM: {client[2]}, CPU: {client[3]}, HDD Size: {client[4]}, HDD ID: {client[5]}\r\n"
+        writer.write(client_info.encode())
+        await writer.drain()
+
+    writer.write(b"End of the list\r\n")
+    await writer.drain()
+
+
+# Функция для получения списка текущих подключений
+async def list_current_connections():
+    async with aiosqlite.connect(DATABASE_NAME) as db:
+        cursor = await db.execute(
+            """
+            SELECT u.username, c.client_id, c.ram_size, c.cpu_count, c.hdd_size, c.hdd_id
+            FROM users u
+            JOIN clients c ON u.client_id = c.client_id
+            JOIN current_connections cc ON u.client_id = cc.client_id
+            """
+        )
+        current_connections = await cursor.fetchall()
+        await cursor.close()
+
+    return current_connections
+
+
+# Обработчик вывода списка текущих подключений
+async def handle_list_current_connections(reader, writer):
+    writer.write(b"List of currently connected clients:\r\n")
+    await writer.drain()
+
+    current_connections = await list_current_connections()
+
+    for connection in current_connections:
+        connection_info = f"Username: {connection[0]}, Client ID: {connection[1]}, RAM: {connection[2]}, CPU: {connection[3]}, HDD Size: {connection[4]}, HDD ID: {connection[5]}\r\n"
+        writer.write(connection_info.encode())
+        await writer.drain()
+
+    writer.write(b"End of the list\r\n")
+    await writer.drain()
+
+
+# Функция для обновления информации о клиенте
+async def update_client_info(client_id, ram_size, cpu_count, hdd_size, hdd_id):
+    async with aiosqlite.connect(DATABASE_NAME) as db:
+        await db.execute(
+            """
+            UPDATE clients
+            SET ram_size = ?, cpu_count = ?, hdd_size = ?, hdd_id = ?
+            WHERE client_id = ?
+            """,
+            (ram_size, cpu_count, hdd_size, hdd_id, client_id)
+        )
+        await db.commit()
+
+
+# Функция для получения общей статистики
+async def get_total_stats():
+    async with aiosqlite.connect(DATABASE_NAME) as db:
+        # Получаем общее количество машин
+        cursor = await db.execute("SELECT COUNT(*) FROM clients")
+        total_machines = await cursor.fetchone()
+        await cursor.close()
+
+        # Получаем общий объем RAM и CPU
+        cursor = await db.execute("SELECT SUM(ram_size), SUM(cpu_count) FROM clients")
+        total_stats = await cursor.fetchone()
+        await cursor.close()
+
+    return total_machines[0], total_stats[0], total_stats[1]
+
+
+# Обработчик вывода общей статистики
+async def handle_total_stats(reader, writer):
+    total_machines, total_ram, total_cpu = await get_total_stats()
+    stats_message = f"Total machines: {total_machines}, Total RAM: {total_ram}, Total CPU: {total_cpu}\r\n"
+    writer.write(stats_message.encode())
+    await writer.drain()
+
+
+# Обработчик основного потока клиента
 async def handle_client(reader, writer):
     writer.write(b"Enter your username: ")
     await writer.drain()
@@ -237,104 +353,10 @@ async def handle_client(reader, writer):
             await writer.drain()
 
 
-async def list_ever_connected_clients():
-    async with aiosqlite.connect(DATABASE_NAME) as db:
-        cursor = await db.execute(
-            """
-            SELECT u.username, c.client_id, c.ram_size, c.cpu_count, c.hdd_size, c.hdd_id
-            FROM users u
-            LEFT JOIN clients c ON u.client_id = c.client_id
-            """
-        )
-        clients = await cursor.fetchall()
-        await cursor.close()
-
-    return clients
-
-
-async def handle_list_ever_connected_clients(reader, writer):
-    writer.write(b"List of ever connected clients:\r\n")
-    await writer.drain()
-
-    clients = await list_ever_connected_clients()
-
-    for client in clients:
-        client_info = f"Username: {client[0]}, Client ID: {client[1]}, RAM: {client[2]}, CPU: {client[3]}, HDD Size: {client[4]}, HDD ID: {client[5]}\r\n"
-        writer.write(client_info.encode())
-        await writer.drain()
-
-    writer.write(b"End of the list\r\n")
-    await writer.drain()
-
-
-async def list_current_connections():
-    async with aiosqlite.connect(DATABASE_NAME) as db:
-        cursor = await db.execute(
-            """
-            SELECT u.username, c.client_id, c.ram_size, c.cpu_count, c.hdd_size, c.hdd_id
-            FROM users u
-            JOIN clients c ON u.client_id = c.client_id
-            JOIN current_connections cc ON u.client_id = cc.client_id
-            """
-        )
-        current_connections = await cursor.fetchall()
-        await cursor.close()
-
-    return current_connections
-
-
-async def handle_list_current_connections(reader, writer):
-    writer.write(b"List of currently connected clients:\r\n")
-    await writer.drain()
-
-    current_connections = await list_current_connections()
-
-    for connection in current_connections:
-        connection_info = f"Username: {connection[0]}, Client ID: {connection[1]}, RAM: {connection[2]}, CPU: {connection[3]}, HDD Size: {connection[4]}, HDD ID: {connection[5]}\r\n"
-        writer.write(connection_info.encode())
-        await writer.drain()
-
-    writer.write(b"End of the list\r\n")
-    await writer.drain()
-
-
-async def update_client_info(client_id, ram_size, cpu_count, hdd_size, hdd_id):
-    async with aiosqlite.connect(DATABASE_NAME) as db:
-        await db.execute(
-            """
-            UPDATE clients
-            SET ram_size = ?, cpu_count = ?, hdd_size = ?, hdd_id = ?
-            WHERE client_id = ?
-            """,
-            (ram_size, cpu_count, hdd_size, hdd_id, client_id)
-        )
-        await db.commit()
-
-
-async def get_total_stats():
-    async with aiosqlite.connect(DATABASE_NAME) as db:
-        # Получаем общее количество машин
-        cursor = await db.execute("SELECT COUNT(*) FROM clients")
-        total_machines = await cursor.fetchone()
-        await cursor.close()
-
-        # Получаем общий объем RAM и CPU
-        cursor = await db.execute("SELECT SUM(ram_size), SUM(cpu_count) FROM clients")
-        total_stats = await cursor.fetchone()
-        await cursor.close()
-
-    return total_machines[0], total_stats[0], total_stats[1]
-
-
-async def handle_total_stats(reader, writer):
-    total_machines, total_ram, total_cpu = await get_total_stats()
-    stats_message = f"Total machines: {total_machines}, Total RAM: {total_ram}, Total CPU: {total_cpu}\r\n"
-    writer.write(stats_message.encode())
-    await writer.drain()
-
-
+# Основная асинхронная функция
 async def main():
     async with aiosqlite.connect(DATABASE_NAME) as db:
+        # Создаем таблицы, если они не существуют
         await db.execute(
             """
             CREATE TABLE IF NOT EXISTS users (
@@ -363,9 +385,10 @@ async def main():
         )
         await db.commit()
 
-    # Clear current connections before starting the server
+    # Очищаем текущие подключения перед запуском сервера
     await clear_current_connections()
 
+    # Запускаем сервер на указанном адресе и порту
     server = await asyncio.start_server(
         handle_client, '127.0.0.1', 8888)
 
@@ -375,5 +398,5 @@ async def main():
     async with server:
         await server.serve_forever()
 
-
+# Запуск основной асинхронной функции
 asyncio.run(main())
