@@ -263,11 +263,14 @@ async def handle_total_stats(reader, writer):
 
 # Обработчик основного потока клиента
 async def handle_client(reader, writer):
+    # Запрашиваем у клиента ввод имени пользователя
     writer.write(b"Enter your username: ")
     await writer.drain()
 
+    # Считываем введенное имя пользователя
     username = (await reader.readuntil(b'\n')).decode().strip()
 
+    # Проверяем, существует ли пользователь в базе данных
     async with aiosqlite.connect(DATABASE_NAME) as db:
         cursor = await db.execute(
             "SELECT COUNT(*) FROM users WHERE username = ?",
@@ -276,6 +279,7 @@ async def handle_client(reader, writer):
         user_exists = await cursor.fetchone()
         await cursor.close()
 
+    # Если пользователь существует, получаем его идентификатор
     if user_exists[0] > 0:
         async with aiosqlite.connect(DATABASE_NAME) as db:
             cursor = await db.execute(
@@ -285,15 +289,18 @@ async def handle_client(reader, writer):
             client_id = await cursor.fetchone()
             await cursor.close()
         client_id = client_id[0]
+        # Сообщаем, что пользователь найден, идет подключение к виртуальной машине
         writer.write(b"User found. Connecting to virtual machine...\r\n")
         await writer.drain()
     else:
+        # Если пользователь не существует, создаем нового пользователя и его виртуальную машину
         client_id = str(uuid.uuid4())
         await create_user(username, client_id)
 
         writer.write(b"User not found. Creating virtual machine...\r\n")
         await writer.drain()
 
+        # Запрашиваем у пользователя информацию о виртуальной машине (RAM, CPU, HDD)
         writer.write(b"Enter RAM size: ")
         await writer.drain()
         ram_size = (await reader.readuntil(b'\n')).decode().strip()
@@ -310,17 +317,21 @@ async def handle_client(reader, writer):
         await writer.drain()
         hdd_id = (await reader.readuntil(b'\n')).decode().strip()
 
+        # Создаем виртуальную машину для нового пользователя
         await create_client(client_id, ram_size, cpu_count, hdd_size, hdd_id)
 
         writer.write(b"Client information saved\r\n")
         await writer.drain()
 
+    # Сообщаем об успешной аутентификации
     writer.write(b"Authentication successful\r\n")
     await writer.drain()
 
+    # Добавляем текущее соединение в список активных соединений
     await add_current_connection(client_id)
 
     while True:
+        # Выводим меню команд для пользователя
         writer.write(b"Type 'list_of_users_ever_connected' to see the list of ever connected clients\r\n")
         writer.write(b"Type 'list_of_current_connections' to see the list of currently connected clients\r\n")
         writer.write(b"Type 'list_of_hard_disks' to see the list of hard disks\r\n")
@@ -330,8 +341,10 @@ async def handle_client(reader, writer):
         writer.write(b"Type 'exit' to exit\r\n")
         await writer.drain()
 
+        # Считываем команду пользователя
         command = (await reader.readuntil(b'\n')).decode().strip()
 
+        # Обработка команд
         if command.lower() == 'list_of_users_ever_connected':
             await handle_list_ever_connected_clients(reader, writer)
         elif command.lower() == 'list_of_current_connections':
@@ -344,13 +357,16 @@ async def handle_client(reader, writer):
             await handle_update_client_info(reader, writer, client_id)
         elif command.lower() == 'list_total_stats':
             await handle_total_stats(reader, writer)
+        # Выход из цикла и сервера при вводе команды 'exit'
         elif command.lower() == 'exit':
+            # Удаляем текущее соединение из списка активных соединений
             await remove_current_connection(client_id)
             writer.write(b"Disconnecting...\r\n")
             await writer.drain()
             writer.close()
             break
         else:
+            # Отправляем сообщение об ошибке при вводе неизвестной команды
             writer.write(b"Error: Unknown command\r\n")
             await writer.drain()
 
