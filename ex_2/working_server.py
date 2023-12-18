@@ -354,7 +354,7 @@ async def handle_client(reader, writer):
         elif command.lower() == 'remove_virtual_machine':
             await handle_remove_virtual_machine(reader, writer, client_id)
         elif command.lower() == 'update_client_info':
-            await handle_update_client_info(reader, writer, client_id)
+            await handle_update_client_info(reader, writer)
         elif command.lower() == 'list_total_stats':
             await handle_total_stats(reader, writer)
         # Выход из цикла и сервера при вводе команды 'exit'
