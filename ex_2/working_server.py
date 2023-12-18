@@ -86,13 +86,20 @@ async def handle_remove_virtual_machine(reader, writer, client_id):
             await writer.drain()
 
 
-# Функция для удаления виртуальной машины
 async def remove_virtual_machine(client_id):
     async with aiosqlite.connect(DATABASE_NAME) as db:
         # Remove from clients table
         await db.execute("DELETE FROM clients WHERE client_id = ?", (client_id,))
         # Remove from users table
         await db.execute("DELETE FROM users WHERE client_id = ?", (client_id,))
+
+        try:
+            # Remove from current_connections table
+            await db.execute("DELETE FROM current_connections WHERE client_id = ?", (client_id,))
+        except aiosqlite.IntegrityError as e:
+            # Handle UNIQUE constraint failure (client_id not found in current_connections)
+            print(f"Warning: {e}")
+
         await db.commit()
 
 
