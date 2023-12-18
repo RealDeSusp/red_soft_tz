@@ -16,7 +16,7 @@ async def create_user(username, client_id):
         await db.commit()
 
 
-# Функция для создания нового клиента
+# Функция для создания нового клиента (виртуальной машины)
 async def create_client(client_id, ram_size, cpu_count, hdd_size, hdd_id):
     async with aiosqlite.connect(DATABASE_NAME) as db:
         await db.execute(
@@ -180,7 +180,8 @@ async def handle_list_ever_connected_clients(reader, writer):
     clients = await list_ever_connected_clients()
 
     for client in clients:
-        client_info = f"Username: {client[0]}, Client ID: {client[1]}, RAM: {client[2]}, CPU: {client[3]}, HDD Size: {client[4]}, HDD ID: {client[5]}\r\n"
+        client_info = f"Username: {client[0]}, Client ID: {client[1]}, RAM: {client[2]}, CPU: {client[3]}, HDD Size: " \
+                      f"{client[4]}, HDD ID: {client[5]}\r\n "
         writer.write(client_info.encode())
         await writer.drain()
 
@@ -213,7 +214,8 @@ async def handle_list_current_connections(reader, writer):
     current_connections = await list_current_connections()
 
     for connection in current_connections:
-        connection_info = f"Username: {connection[0]}, Client ID: {connection[1]}, RAM: {connection[2]}, CPU: {connection[3]}, HDD Size: {connection[4]}, HDD ID: {connection[5]}\r\n"
+        connection_info = f"Username: {connection[0]}, Client ID: {connection[1]}, RAM: {connection[2]}, CPU: " \
+                          f"{connection[3]}, HDD Size: {connection[4]}, HDD ID: {connection[5]}\r\n"
         writer.write(connection_info.encode())
         await writer.drain()
 
@@ -388,7 +390,7 @@ async def main():
     # Очищаем текущие подключения перед запуском сервера
     await clear_current_connections()
 
-    # Запускаем сервер на указанном адресе и порту
+    # Запускаем сервер на указанном адресе и порте
     server = await asyncio.start_server(
         handle_client, '127.0.0.1', 8888)
 
