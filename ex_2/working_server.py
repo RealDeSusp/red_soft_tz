@@ -102,6 +102,12 @@ async def handle_update_client_info(reader, writer):
     await writer.drain()
     client_id_to_update = (await reader.readuntil(b'\n')).decode().strip()
 
+    # Проверяем существование клиента с указанным ID
+    if not await client_exists(client_id_to_update):
+        writer.write(b"Error: No client found with the provided client_id\r\n")
+        await writer.drain()
+        return
+
     writer.write(b"Enter new RAM size: ")
     await writer.drain()
     new_ram_size = (await reader.readuntil(b'\n')).decode().strip()
